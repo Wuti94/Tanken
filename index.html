@@ -21,20 +21,17 @@
       <div class="brand">Tankbuch</div>
       <div id="status" class="status"></div>
     </div>
-
     <div class="topbar__right">
-      <button id="btnGoHome" class="iconbtn" title="Start">Start</button>
-      <button id="btnGoSettings" class="iconbtn" title="Einstellungen">Einstellungen</button>
+      <button id="btnGoHome" class="iconbtn" title="Start" type="button">Start</button>
+      <button id="btnGoSettings" class="iconbtn" title="Einstellungen" type="button">Einstellungen</button>
     </div>
   </header>
 
   <main class="page">
-
     <!-- HOME -->
     <section id="viewHome" class="view view--active" aria-label="Startseite">
       <div class="card">
         <h1 class="h1">Tankvorgang</h1>
-
         <form id="formFillup" class="form">
           <div class="row">
             <label class="field">
@@ -72,7 +69,6 @@
           </label>
 
           <div class="meta" id="fillupPriceInfo"></div>
-
           <button class="btn btn-primary" type="submit">Speichern</button>
         </form>
       </div>
@@ -82,7 +78,6 @@
           <h2 class="h2">Letzte Tankvorgänge</h2>
           <div class="muted" id="fillupsCount"></div>
         </div>
-
         <div id="listFillups" class="list" aria-label="Liste Tankvorgänge"></div>
       </div>
     </section>
@@ -114,87 +109,92 @@
           Hinweis: Daten liegen nur lokal auf dem Gerät (IndexedDB). Export/Import ist manuell.
         </p>
       </div>
-
-      <!-- Subview: Vehicles -->
-      <div id="panelVehicles" class="panel" hidden>
-        <div class="panel__head">
-          <h2 class="h2">Fahrzeuge</h2>
-          <button id="btnCloseVehicles" class="iconbtn" type="button">Schließen</button>
-        </div>
-
-        <div class="card">
-          <form id="formVehicle" class="form">
-            <label class="field">
-              Name
-              <input id="vehicleName" required placeholder="z. B. Transporter" />
-            </label>
-            <label class="field">
-              Kennzeichen (optional)
-              <input id="vehiclePlate" placeholder="z. B. AB-XY 123" />
-            </label>
-
-            <div class="actions">
-              <button class="btn btn-primary" type="submit">Hinzufügen</button>
-              <button id="btnSeedVehicles" class="btn btn-secondary" type="button">2 Standard-Fahrzeuge</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card">
-          <div id="listVehicles" class="list" aria-label="Liste Fahrzeuge"></div>
-        </div>
-      </div>
-
-      <!-- Subview: Prices -->
-      <div id="panelPrices" class="panel" hidden>
-        <div class="panel__head">
-          <h2 class="h2">Preisphasen</h2>
-          <button id="btnClosePrices" class="iconbtn" type="button">Schließen</button>
-        </div>
-
-        <div class="card">
-          <p class="muted">
-            Neuer Preis gilt ab 00:00 Uhr des Datums bis zur nächsten Änderung.
-          </p>
-
-          <form id="formPrice" class="form">
-            <div class="row">
-              <label class="field">
-                Kraftstoff
-                <select id="priceFuelType" required>
-                  <option value="DIESEL">Diesel</option>
-                  <option value="SUPER">Super</option>
-                </select>
-              </label>
-
-              <label class="field">
-                Gültig ab (Datum)
-                <input id="priceValidFromDate" type="date" required />
-              </label>
-            </div>
-
-            <label class="field">
-              Preis pro Liter (€)
-              <input id="pricePerLiter" type="number" step="0.001" min="0" required inputmode="decimal" placeholder="z. B. 1.679" />
-            </label>
-
-            <label class="field">
-              Notiz (optional)
-              <input id="priceNote" placeholder="z. B. Lieferung September" />
-            </label>
-
-            <button class="btn btn-primary" type="submit">Preisphase speichern</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <div id="listPrices" class="list" aria-label="Liste Preisphasen"></div>
-        </div>
-      </div>
-
     </section>
-
   </main>
+
+  <!-- POPUP / MODAL: Vehicles -->
+  <div id="modalVehicles" class="modal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="modalVehicles"></div>
+
+    <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="mvTitle">
+      <div class="modal__head">
+        <h2 id="mvTitle" class="h2">Fahrzeuge</h2>
+        <button id="btnCloseVehicles" class="iconbtn" type="button">Schließen</button>
+      </div>
+
+      <div class="card card--flat">
+        <form id="formVehicle" class="form">
+          <label class="field">
+            Name
+            <input id="vehicleName" required placeholder="z. B. Transporter" />
+          </label>
+          <label class="field">
+            Kennzeichen (optional)
+            <input id="vehiclePlate" placeholder="z. B. AB-XY 123" />
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Hinzufügen</button>
+            <button id="btnSeedVehicles" class="btn btn-secondary" type="button">2 Standard-Fahrzeuge</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card card--flat">
+        <div id="listVehicles" class="list" aria-label="Liste Fahrzeuge"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POPUP / MODAL: Prices -->
+  <div id="modalPrices" class="modal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="modalPrices"></div>
+
+    <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="mpTitle">
+      <div class="modal__head">
+        <h2 id="mpTitle" class="h2">Preisphasen</h2>
+        <button id="btnClosePrices" class="iconbtn" type="button">Schließen</button>
+      </div>
+
+      <div class="card card--flat">
+        <p class="muted">
+          Neuer Preis gilt ab 00:00 Uhr des Datums bis zur nächsten Änderung.
+        </p>
+
+        <form id="formPrice" class="form">
+          <div class="row">
+            <label class="field">
+              Kraftstoff
+              <select id="priceFuelType" required>
+                <option value="DIESEL">Diesel</option>
+                <option value="SUPER">Super</option>
+              </select>
+            </label>
+
+            <label class="field">
+              Gültig ab (Datum)
+              <input id="priceValidFromDate" type="date" required />
+            </label>
+          </div>
+
+          <label class="field">
+            Preis pro Liter (€)
+            <input id="pricePerLiter" type="number" step="0.001" min="0" required inputmode="decimal" placeholder="z. B. 1.679" />
+          </label>
+
+          <label class="field">
+            Notiz (optional)
+            <input id="priceNote" placeholder="z. B. Lieferung September" />
+          </label>
+
+          <button class="btn btn-primary" type="submit">Preisphase speichern</button>
+        </form>
+      </div>
+
+      <div class="card card--flat">
+        <div id="listPrices" class="list" aria-label="Liste Preisphasen"></div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./app.js"></script>
 </body>
