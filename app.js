@@ -38,25 +38,30 @@ function localNowForDateTimeLocal(){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* Views */
+/* -------- Views -------- */
 function showView(which){
   el("viewHome").classList.toggle("view--active", which === "home");
   el("viewSettings").classList.toggle("view--active", which === "settings");
 
-  // close modals on view switch
+  // Popups schließen beim Wechsel
   closeModal("modalVehicles");
   closeModal("modalPrices");
 
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-/* Modals */
+/* -------- Modals (Popups) -------- */
 function openModal(id){
   const m = el(id);
+  if (!m) {
+    console.error("openModal: Element nicht gefunden:", id);
+    return;
+  }
   m.hidden = false;
   m.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 }
+
 function closeModal(id){
   const m = el(id);
   if (!m) return;
@@ -65,7 +70,7 @@ function closeModal(id){
   document.body.style.overflow = "";
 }
 
-/* Render */
+/* -------- Render -------- */
 async function refreshAll(){
   const [vehicles, prices, fillups] = await Promise.all([
     listVehicles(db),
@@ -75,7 +80,6 @@ async function refreshAll(){
 
   renderVehicleSelect(vehicles);
   renderFillupsList(vehicles, fillups);
-
   renderVehiclesList(vehicles);
   renderPricesList(prices);
 
@@ -84,6 +88,8 @@ async function refreshAll(){
 
 function renderVehicleSelect(vehicles){
   const sel = el("fillVehicleId");
+  if (!sel) return;
+
   const current = sel.value;
   sel.innerHTML = "";
 
@@ -103,7 +109,6 @@ function renderFillupsList(vehicles, fillups){
   list.innerHTML = "";
 
   const recent = fillups.slice(0, 20);
-
   if (recent.length === 0){
     list.innerHTML = `<div class="muted">Noch keine Tankvorgänge gespeichert.</div>`;
     return;
@@ -194,23 +199,26 @@ function renderPricesList(prices){
   }
 }
 
-/* Price info */
+/* -------- Price info -------- */
 async function updateFillupPriceInfo(){
   const fuelType = el("fillFuelType").value;
   const dateTime = el("fillDateTime").value;
+
   if (!dateTime){
     el("fillupPriceInfo").textContent = "";
     return;
   }
+
   const price = await getPriceForDateTime(db, fuelType, dateTime);
   el("fillupPriceInfo").textContent = price == null
     ? `Kein Preis für ${fmtFuel(fuelType)} hinterlegt (Einstellungen → Preisphasen).`
     : `Automatischer Preis: ${num(price,3)} €/L`;
 }
 
-/* Handlers */
+/* -------- Handlers -------- */
 async function onAddFillup(e){
   e.preventDefault();
+
   const vehicleId = el("fillVehicleId").value;
   const fuelType = el("fillFuelType").value;
   const dateTime = el("fillDateTime").value;
@@ -327,10 +335,10 @@ async function onHardReset(){
   setStatus("Alle lokalen Daten gelöscht.");
 }
 
-async function onClick(e){
+async function onGlobalClick(e){
   const t = e.target;
 
-  // close modal by clicking backdrop
+  // Backdrop click closes modal
   const closeId = t?.getAttribute?.("data-close-modal");
   if (closeId){
     closeModal(closeId);
@@ -363,37 +371,39 @@ async function onClick(e){
   }
 }
 
-/* SW */
+/* -------- SW -------- */
 async function registerSw(){
   if (!("serviceWorker" in navigator)) return;
   try{
     await navigator.serviceWorker.register("./sw.js", { scope:"./" });
-    setStatus("Offline bereit.");
-  } catch {
+    // nicht dauernd überschreiben, nur wenn leer
+    if (!el("status").textContent) setStatus("Offline bereit.");
+  } catch (err){
+    console.warn("SW Fehler:", err);
     setStatus("Offline nicht aktiv (SW Fehler).");
   }
 }
 
-/* Init */
+/* -------- Init -------- */
 (async function init(){
   db = await openDb();
 
-  // defaults
+  // Defaults
   el("fillDateTime").value = localNowForDateTimeLocal();
   el("priceValidFromDate").value = new Date().toISOString().slice(0,10);
 
-  // navigation
+  // Navigation
   el("btnGoHome").addEventListener("click", () => showView("home"));
   el("btnGoSettings").addEventListener("click", () => showView("settings"));
 
-  // open/close modals
+  // IMPORTANT: Popup Buttons
   el("btnOpenVehicles").addEventListener("click", () => openModal("modalVehicles"));
   el("btnCloseVehicles").addEventListener("click", () => closeModal("modalVehicles"));
 
   el("btnOpenPrices").addEventListener("click", () => openModal("modalPrices"));
   el("btnClosePrices").addEventListener("click", () => closeModal("modalPrices"));
 
-  // close by ESC
+  // ESC closes
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeModal("modalVehicles");
@@ -401,7 +411,7 @@ async function registerSw(){
     }
   });
 
-  // forms
+  // Forms
   el("formFillup").addEventListener("submit", onAddFillup);
   el("fillFuelType").addEventListener("change", updateFillupPriceInfo);
   el("fillDateTime").addEventListener("change", updateFillupPriceInfo);
@@ -411,25 +421,28 @@ async function registerSw(){
 
   el("formPrice").addEventListener("submit", onAddPrice);
 
-  // backup
+  // Backup
   el("btnExport").addEventListener("click", onExport);
   el("fileImport").addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (file) await onImportFile(file);
   });
-
   el("btnHardReset").addEventListener("click", onHardReset);
 
-  // global click handling (delete + backdrop close)
-  document.addEventListener("click", onClick);
+  // Global clicks (delete + backdrop close)
+  document.addEventListener("click", onGlobalClick);
 
   await refreshAll();
   await updateFillupPriceInfo();
   await registerSw();
 
+  // hint if empty
   const vehicles = await listVehicles(db);
-  if (vehicles.length === 0) {
-    setStatus("Bitte zuerst Fahrzeuge anlegen (Einstellungen).");
-  }
+  if (vehicles.length === 0) setStatus("Bitte zuerst Fahrzeuge anlegen (Einstellungen).");
+
+  console.log("Init OK. Modal elements:",
+    !!el("modalVehicles"), !!el("modalPrices"),
+    "Buttons:", !!el("btnOpenVehicles"), !!el("btnOpenPrices")
+  );
 })();
