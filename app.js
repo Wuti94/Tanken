@@ -38,19 +38,38 @@ function localNowForDateTimeLocal(){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function parseLocalDateTime(dateTimeLocal){
+  // dateTimeLocal like "YYYY-MM-DDTHH:mm"
+  // Interpret as local time:
+  const [datePart, timePart] = dateTimeLocal.split("T");
+  const [y,m,d] = datePart.split("-").map(Number);
+  const [hh,mm] = timePart.split(":").map(Number);
+  return new Date(y, m - 1, d, hh, mm, 0, 0);
+}
+
+function lastCalendarMonthRange(){
+  // returns { start: Date, end: Date, label: "MM.YYYY" } in local time
+  const now = new Date();
+  const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const startLastMonth = new Date(startThisMonth.getFullYear(), startThisMonth.getMonth() - 1, 1, 0, 0, 0, 0);
+  const endLastMonth = new Date(startThisMonth.getTime() - 1); // last millisecond of previous month
+
+  const label = new Intl.DateTimeFormat("de-DE", { month: "2-digit", year: "numeric" }).format(startLastMonth);
+  return { start: startLastMonth, end: endLastMonth, label };
+}
+
 /* -------- Views -------- */
 function showView(which){
   el("viewHome").classList.toggle("view--active", which === "home");
   el("viewSettings").classList.toggle("view--active", which === "settings");
 
-  // Popups schließen beim Wechsel
   closeModal("modalVehicles");
   closeModal("modalPrices");
 
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-/* -------- Modals (Popups) -------- */
+/* -------- Modals -------- */
 function openModal(id){
   const m = el(id);
   if (!m) {
@@ -84,6 +103,8 @@ async function refreshAll(){
   renderPricesList(prices);
 
   el("fillupsCount").textContent = `${fillups.length} gesamt`;
+
+  renderLastMonthCosts(fillups);   // <-- NEU
 }
 
 function renderVehicleSelect(vehicles){
@@ -197,6 +218,39 @@ function renderPricesList(prices){
     `;
     list.appendChild(item);
   }
+}
+
+/* -------- NEW: Last month cost widget -------- */
+function renderLastMonthCosts(fillups){
+  const labelEl = el("lastMonthLabel");
+  const costEl  = el("lastMonthCost");
+  const metaEl  = el("lastMonthMeta");
+
+  // Falls du den Block noch nicht eingefügt hast, nichts tun:
+  if (!labelEl || !costEl || !metaEl) return;
+
+  const { start, end, label } = lastCalendarMonthRange();
+  labelEl.textContent = label;
+
+  const inRange = fillups.filter(f => {
+    if (!f?.dateTime) return false;
+    const dt = parseLocalDateTime(f.dateTime);
+    return dt >= start && dt <= end;
+  });
+
+  const sum = inRange.reduce((acc, f) => {
+    const tc = (typeof f.totalCost === "number" && Number.isFinite(f.totalCost))
+      ? f.totalCost
+      : (Number(f.liters) * Number(f.pricePerLiter));
+    return acc + (Number.isFinite(tc) ? tc : 0);
+  }, 0);
+
+  const liters = inRange.reduce((acc, f) => acc + (Number.isFinite(Number(f.liters)) ? Number(f.liters) : 0), 0);
+
+  costEl.textContent = euro(Math.round(sum * 100) / 100);
+  metaEl.textContent = inRange.length === 0
+    ? "Keine Tankvorgänge im letzten Monat."
+    : `${inRange.length} Tankvorgänge · ${num(liters, 2)} L`;
 }
 
 /* -------- Price info -------- */
@@ -376,7 +430,6 @@ async function registerSw(){
   if (!("serviceWorker" in navigator)) return;
   try{
     await navigator.serviceWorker.register("./sw.js", { scope:"./" });
-    // nicht dauernd überschreiben, nur wenn leer
     if (!el("status").textContent) setStatus("Offline bereit.");
   } catch (err){
     console.warn("SW Fehler:", err);
@@ -396,7 +449,7 @@ async function registerSw(){
   el("btnGoHome").addEventListener("click", () => showView("home"));
   el("btnGoSettings").addEventListener("click", () => showView("settings"));
 
-  // IMPORTANT: Popup Buttons
+  // Popups
   el("btnOpenVehicles").addEventListener("click", () => openModal("modalVehicles"));
   el("btnCloseVehicles").addEventListener("click", () => closeModal("modalVehicles"));
 
@@ -437,12 +490,6 @@ async function registerSw(){
   await updateFillupPriceInfo();
   await registerSw();
 
-  // hint if empty
   const vehicles = await listVehicles(db);
   if (vehicles.length === 0) setStatus("Bitte zuerst Fahrzeuge anlegen (Einstellungen).");
-
-  console.log("Init OK. Modal elements:",
-    !!el("modalVehicles"), !!el("modalPrices"),
-    "Buttons:", !!el("btnOpenVehicles"), !!el("btnOpenPrices")
-  );
 })();
