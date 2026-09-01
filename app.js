@@ -38,17 +38,32 @@ function localNowForDateTimeLocal(){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/* Views */
 function showView(which){
   el("viewHome").classList.toggle("view--active", which === "home");
   el("viewSettings").classList.toggle("view--active", which === "settings");
-  // close panels on view switch
-  closePanel("panelVehicles");
-  closePanel("panelPrices");
+
+  // close modals on view switch
+  closeModal("modalVehicles");
+  closeModal("modalPrices");
+
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-function openPanel(id){ el(id).hidden = false; el(id).scrollIntoView({ behavior:"smooth", block:"start" }); }
-function closePanel(id){ el(id).hidden = true; }
+/* Modals */
+function openModal(id){
+  const m = el(id);
+  m.hidden = false;
+  m.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+function closeModal(id){
+  const m = el(id);
+  if (!m) return;
+  m.hidden = true;
+  m.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
 
 /* Render */
 async function refreshAll(){
@@ -79,7 +94,6 @@ function renderVehicleSelect(vehicles){
     sel.appendChild(opt);
   }
 
-  // try to keep previous selection
   if (current && vehicles.some(v => v.id === current)) sel.value = current;
 }
 
@@ -180,7 +194,7 @@ function renderPricesList(prices){
   }
 }
 
-/* Logic */
+/* Price info */
 async function updateFillupPriceInfo(){
   const fuelType = el("fillFuelType").value;
   const dateTime = el("fillDateTime").value;
@@ -190,7 +204,7 @@ async function updateFillupPriceInfo(){
   }
   const price = await getPriceForDateTime(db, fuelType, dateTime);
   el("fillupPriceInfo").textContent = price == null
-    ? `Kein Preis für ${fmtFuel(fuelType)} hinterlegt (bitte in Einstellungen anlegen).`
+    ? `Kein Preis für ${fmtFuel(fuelType)} hinterlegt (Einstellungen → Preisphasen).`
     : `Automatischer Preis: ${num(price,3)} €/L`;
 }
 
@@ -316,6 +330,13 @@ async function onHardReset(){
 async function onClick(e){
   const t = e.target;
 
+  // close modal by clicking backdrop
+  const closeId = t?.getAttribute?.("data-close-modal");
+  if (closeId){
+    closeModal(closeId);
+    return;
+  }
+
   const delFillupId = t?.getAttribute?.("data-del-fillup");
   if (delFillupId){
     if (!confirm("Tankvorgang löschen?")) return;
@@ -357,21 +378,30 @@ async function registerSw(){
 (async function init(){
   db = await openDb();
 
-  // Defaults
+  // defaults
   el("fillDateTime").value = localNowForDateTimeLocal();
   el("priceValidFromDate").value = new Date().toISOString().slice(0,10);
 
-  // Navigation
+  // navigation
   el("btnGoHome").addEventListener("click", () => showView("home"));
   el("btnGoSettings").addEventListener("click", () => showView("settings"));
 
-  // Panels
-  el("btnOpenVehicles").addEventListener("click", () => openPanel("panelVehicles"));
-  el("btnCloseVehicles").addEventListener("click", () => closePanel("panelVehicles"));
-  el("btnOpenPrices").addEventListener("click", () => openPanel("panelPrices"));
-  el("btnClosePrices").addEventListener("click", () => closePanel("panelPrices"));
+  // open/close modals
+  el("btnOpenVehicles").addEventListener("click", () => openModal("modalVehicles"));
+  el("btnCloseVehicles").addEventListener("click", () => closeModal("modalVehicles"));
 
-  // Forms
+  el("btnOpenPrices").addEventListener("click", () => openModal("modalPrices"));
+  el("btnClosePrices").addEventListener("click", () => closeModal("modalPrices"));
+
+  // close by ESC
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeModal("modalVehicles");
+      closeModal("modalPrices");
+    }
+  });
+
+  // forms
   el("formFillup").addEventListener("submit", onAddFillup);
   el("fillFuelType").addEventListener("change", updateFillupPriceInfo);
   el("fillDateTime").addEventListener("change", updateFillupPriceInfo);
@@ -381,7 +411,7 @@ async function registerSw(){
 
   el("formPrice").addEventListener("submit", onAddPrice);
 
-  // Backup
+  // backup
   el("btnExport").addEventListener("click", onExport);
   el("fileImport").addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
@@ -391,13 +421,13 @@ async function registerSw(){
 
   el("btnHardReset").addEventListener("click", onHardReset);
 
+  // global click handling (delete + backdrop close)
   document.addEventListener("click", onClick);
 
   await refreshAll();
   await updateFillupPriceInfo();
   await registerSw();
 
-  // If no vehicles exist, gently route to settings
   const vehicles = await listVehicles(db);
   if (vehicles.length === 0) {
     setStatus("Bitte zuerst Fahrzeuge anlegen (Einstellungen).");
